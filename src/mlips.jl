@@ -14,11 +14,9 @@ import JuLIP:      energy, forces, virial, site_energy, site_energy_d,
 
 import JuLIP.Potentials: site_virial
 
-import ACEbase: combine
-
 import Base:       ==
 
-export IPSuperBasis, IPCollection, combine 
+export IPSuperBasis, IPCollection, combine
 
 abstract type AbstractBasis <: AbstractCalculator end
 
@@ -296,15 +294,29 @@ end
 function site_energy_d(basis::IPBasis, at::AbstractAtoms{T}, i0::Integer) where {T}
    Ineigs, Rs, Zs = _get_neigs(at, i0, cutoff(basis))
    dEs = [ zeros(JVec{T}, length(at)) for _ = 1:length(basis) ]
+   # BUG! 
+   B = alloc_B(basis, length(Rs))
+   #
    dB = alloc_dB(basis, length(Rs))
    tmp = alloc_temp_d(basis, length(Rs))
-   evaluate_d!(dB, tmp, basis, Rs, Zs, at.Z[i0])
+   #
+   # evaluate_d!(dB, tmp, basis, Rs, Zs, at.Z[i0])
+   evaluate_d!(B, dB, tmp, basis, Rs, Zs, at.Z[i0])
+   #
    @assert dB isa Matrix{JVec{T}}
-   @assert size(dB) == (length(Rs), length(basis))
+
+   # BUG
+   @assert size(dB) == (length(basis), length(Rs))
    for iB = 1:length(basis), n = 1:length(Ineigs)
-      dEs[iB][Ineigs[n]] += dB[n, iB]
-      dEs[iB][i0] -= dB[n, iB]
+      dEs[iB][Ineigs[n]] += dB[iB, n]
+      dEs[iB][i0] -= dB[iB, n]
    end
+
+   # @assert size(dB) == (length(Rs), length(basis))
+   # for iB = 1:length(basis), n = 1:length(Ineigs)
+   #    dEs[iB][Ineigs[n]] += dB[n, iB]
+   #    dEs[iB][i0] -= dB[n, iB]
+   # end
    return dEs
 end
 
